@@ -1,12 +1,16 @@
 function Get-SenderIPs {
     
     param(
-        [Parameter(Mandatory=$true)][string[]]$domains,
-        [Parameter(Mandatory=$false)][int]$cd,
-        [Switch]$c
+        [Parameter(Mandatory)][string[]]$domains,
+        # call-depth counter (do not specify)
+        [Parameter(DontShow)][int]$cd,
+        # add domain names to IP addresses
+        [Switch]$d,
+        # output in CSV format
+        [Switch]$csv
     )
 
-    # infinite loop protection - the 'redirect' modifier and 'include' mechanism may create infinite loops
+    # call-depth limit - the SPF 'redirect' modifier and 'include' mechanism may create infinite loops
     if ($cd -ge 11) {break}
 
     $ipList = @()
@@ -28,19 +32,25 @@ function Get-SenderIPs {
                     "a"          {$ipList += Resolve-DnsName -Type A -Name $domain | foreach {$_.IPAddress}; break}
                     "a:*"        {$ipList += Resolve-DnsName -Type A -Name $spfTerm.Substring(2) | foreach {$_.IPAddress}; break}
                     "ip4:*"      {$ipList += $spfTerm.Substring(4); break}
-                    "include:*"  {$ipList += Get-SenderIPs $spfTerm.Substring(8) ($cd + 1) -c:$c; break}
-                    "redirect=*" {$ipList += Get-SenderIPs $spfTerm.Substring(9) ($cd + 1) -c:$c; break}
+                    "include:*"  {$ipList += Get-SenderIPs $spfTerm.Substring(8) ($cd + 1) -d:$d; break}
+                    "redirect=*" {$ipList += Get-SenderIPs $spfTerm.Substring(9) ($cd + 1) -d:$d; break}
                 }
         }
-        # Switch: concatenate $domain to the end of the IP addresses (comma separated)
-        if ($c -and $cd -eq 0) {
+        # Switch: concatenate $domain to the end of the IP addresses
+        if ($d -And $cd -eq 0) {
             for ($i=0; $i -lt $ipList.length; $i++) {
                 if ($ipList[$i] -match "[\d]$") {
-                    $ipList[$i] = "$($ipList[$i]),$domain"
+                    # CSV format (switch)
+                    if ($csv) {
+                        $ipList[$i] = "`"$($ipList[$i])`",`"$domain`""
+                    # TAB delimited (default)
+                    } else {
+                        $ipList[$i] = "$($ipList[$i])`t$domain"
+                    }
                 }
             }
         }
     }
     # remove duplicate IPs and return the IP list
-    $ipList | select -unique
+    Write-Output $ipList | select -unique
 }
