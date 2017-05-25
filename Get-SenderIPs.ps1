@@ -2,12 +2,12 @@ function Get-SenderIPs {
     
     param(
         [Parameter(Mandatory=$true)][string[]]$domains,
-        [Parameter(Mandatory=$false)][int]$dc,
+        [Parameter(Mandatory=$false)][int]$cd,
         [Switch]$c
     )
 
     # infinite loop protection - the 'redirect' modifier and 'include' mechanism may create infinite loops
-    if ($dc -ge 11) {break}
+    if ($cd -ge 11) {break}
 
     $ipList = @()
 
@@ -28,12 +28,12 @@ function Get-SenderIPs {
                     "a"          {$ipList += Resolve-DnsName -Type A -Name $domain | foreach {$_.IPAddress}; break}
                     "a:*"        {$ipList += Resolve-DnsName -Type A -Name $spfTerm.Substring(2) | foreach {$_.IPAddress}; break}
                     "ip4:*"      {$ipList += $spfTerm.Substring(4); break}
-                    "include:*"  {$ipList += Get-SenderIPs $spfTerm.Substring(8) ($dc + 1) -c:$c; break}
-                    "redirect=*" {$ipList += Get-SenderIPs $spfTerm.Substring(9) ($dc + 1) -c:$c; break}
+                    "include:*"  {$ipList += Get-SenderIPs $spfTerm.Substring(8) ($cd + 1) -c:$c; break}
+                    "redirect=*" {$ipList += Get-SenderIPs $spfTerm.Substring(9) ($cd + 1) -c:$c; break}
                 }
         }
-        # Switch: concatenate $domain to the end of the IP address (comma separated)
-        if ($c -and $dc -eq 0) {
+        # Switch: concatenate $domain to the end of the IP addresses (comma separated)
+        if ($c -and $cd -eq 0) {
             for ($i=0; $i -lt $ipList.length; $i++) {
                 if ($ipList[$i] -match "[\d]$") {
                     $ipList[$i] = "$($ipList[$i]),$domain"
