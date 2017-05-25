@@ -2,11 +2,12 @@ function Get-SenderIPs {
     
     param(
         [Parameter(Mandatory=$true)][string[]]$domains,
-        [Parameter(Mandatory=$false)][int]$c
+        [Parameter(Mandatory=$false)][int]$dc,
+        [Switch]$c
     )
 
     # infinite loop protection - the 'redirect' modifier and 'include' mechanism may create infinite loops
-    if ($c -ge 11) {break}
+    if ($dc -ge 11) {break}
 
     $ipList = @()
 
@@ -27,11 +28,19 @@ function Get-SenderIPs {
                     "a"          {$ipList += Resolve-DnsName -Type A -Name $domain | foreach {$_.IPAddress}; break}
                     "a:*"        {$ipList += Resolve-DnsName -Type A -Name $spfTerm.Substring(2) | foreach {$_.IPAddress}; break}
                     "ip4:*"      {$ipList += $spfTerm.Substring(4); break}
-                    "include:*"  {$ipList += get-SenderIPs $spfTerm.Substring(8) ($c + 1); break}
-                    "redirect=*" {$ipList += get-SenderIPs $spfTerm.Substring(9) ($c + 1); break}
+                    "include:*"  {$ipList += Get-SenderIPs $spfTerm.Substring(8) ($dc + 1) -c:$c; break}
+                    "redirect=*" {$ipList += Get-SenderIPs $spfTerm.Substring(9) ($dc + 1) -c:$c; break}
                 }
+        }
+        # Switch: concatenate $domain to the end of the IP address (comma separated)
+        if ($c -and $dc -eq 0) {
+            for ($i=0; $i -lt $ipList.length; $i++) {
+                if ($ipList[$i] -match "[\d]$") {
+                    $ipList[$i] = "$($ipList[$i]),$domain"
+                }
+            }
         }
     }
     # remove duplicate IPs and return the IP list
-    Write-Output $ipList | select -unique
+    $ipList | select -unique
 }
