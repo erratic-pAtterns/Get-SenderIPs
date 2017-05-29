@@ -5,9 +5,7 @@ function Get-SenderIPs {
         # call-depth counter (do not specify)
         [Parameter(DontShow)][int]$cd,
         # add domain names to IP addresses
-        [Switch]$d,
-        # output in CSV format
-        [Switch]$csv
+        [Switch]$d
     )
 
     # call-depth limit - the SPF 'redirect' modifier and 'include' mechanism may create infinite loops
@@ -38,19 +36,11 @@ function Get-SenderIPs {
         }
         # Switch: concatenate $domain to the end of the IP addresses
         if ($d -And $cd -eq 0) {
-            for ($i=0; $i -lt $ipList.length; $i++) {
-                if ($ipList[$i] -match "[\d]$") {
-                    # CSV format (switch)
-                    if ($csv) {
-                        $ipList[$i] = "`"$($ipList[$i])`",`"$domain`""
-                    # TAB delimited (default)
-                    } else {
-                        $ipList[$i] = "$($ipList[$i])`t$domain"
-                    }
-                }
-            }
+            # TAB delimited
+            $ipList = $ipList -replace "[\d\.\/]+$", "$&`t$domain"
         }
     }
+
     # remove duplicate IPs and return the IP list
     Write-Output $ipList | select -unique
 }
